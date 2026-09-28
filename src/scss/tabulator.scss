@@ -522,6 +522,18 @@ $rangeHeaderTextHighlightBackground: #000000 !default; //header text color when 
 					background-color: $rangeHandleColor;
 					border-radius: 999px;
 				}
+				
+				.tabulator-range-fill-handle {
+					position: absolute;
+					right: -3px;
+					bottom: -3px;
+					width: 6px;
+					height: 6px;
+					background-color: $rangeHandleColor;
+					border-radius: 999px;
+					cursor: crosshair;
+					pointer-events: auto;
+				}
 			}
 			
 			.tabulator-range-cell-active {
@@ -1441,6 +1453,11 @@ $rangeHeaderTextHighlightBackground: #000000 !default; //header text color when 
 					height: 6px;
 					background-color: $rangeHandleColor;
 					border-radius: 999px;
+				}
+				
+				.tabulator-range-fill-handle {
+					left: -3px;
+					right: initial;
 				}
 			}
 		}
