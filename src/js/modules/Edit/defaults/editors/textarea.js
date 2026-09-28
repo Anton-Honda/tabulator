@@ -28,7 +28,7 @@ export default function(cell, onRendered, success, cancel, editorParams){
 		}
 	}
 
-	input.value = value;
+	input.value = editorParams.initialValue ?? value;
 
 	onRendered(function(){
 		if(cell.getType() === "cell"){

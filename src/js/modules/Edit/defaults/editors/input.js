@@ -23,7 +23,7 @@ export default function(cell, onRendered, success, cancel, editorParams){
 		}
 	}
 
-	input.value = typeof cellValue !== "undefined" ? cellValue : "";
+	input.value = editorParams.initialValue ?? (typeof cellValue !== "undefined" ? cellValue : "");
 
 	onRendered(function(){
 		if(cell.getType() === "cell"){
