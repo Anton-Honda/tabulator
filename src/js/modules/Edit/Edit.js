@@ -593,9 +593,9 @@ export default class Edit extends Module{
 		this.recursionBlock = false;
 	}
 	
-	editCell(cell, forceEdit){
+	editCell(cell, forceEdit, editorParams){
 		this.focusCellNoEvent(cell);
-		this.edit(cell, false, forceEdit);
+		this.edit(cell, false, forceEdit, editorParams);
 	}
 	
 	focusScrollAdjust(cell){
@@ -660,7 +660,7 @@ export default class Edit extends Module{
 		return check;
 	}
 	
-	edit(cell, e, forceEdit){
+	edit(cell, e, forceEdit, editorParams){
 		var self = this,
 		allowEdit = true,
 		rendered = function(){},
@@ -770,6 +770,10 @@ export default class Edit extends Module{
 				this.dispatchExternal("cellEditing", component);
 				
 				params = typeof cell.column.modules.edit.params === "function" ? cell.column.modules.edit.params(component) : cell.column.modules.edit.params;
+
+				if(editorParams){
+					params = {...params, ...editorParams};
+				}
 				
 				cellEditor = cell.column.modules.edit.editor.call(self, component, onRendered, success, cancel, params);
 				
