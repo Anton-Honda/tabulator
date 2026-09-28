@@ -21,6 +21,10 @@ class FakeCell {
 	getValue() {
 		return this.row.data[this.column.field];
 	}
+
+	getComponent() {
+		return this;
+	}
 }
 
 class FakeRow {
@@ -57,6 +61,7 @@ function createFillHandle() {
 
 	const table = {
 		eventBus: { subscribe: jest.fn() },
+		externalEvents: { dispatch: jest.fn() },
 		blockRedraw: jest.fn(),
 		restoreRedraw: jest.fn(),
 		modules: {
@@ -154,6 +159,22 @@ describe("FillHandle", () => {
 		const action = fillHandle.table.modules.history.action;
 		expect(action).toHaveBeenCalledTimes(1);
 		expect(action.mock.calls[0][0]).toBe("rangeFill");
+	});
+
+	test("dispatches rangeFilled with only the cells whose value changed", () => {
+		const fillHandle = createFillHandle();
+		const rows = fillHandle.rangeManager.getTableRows();
+		rows[2].data.name = "A";
+
+		fillHandle.fill(new Rect(0, 0, 1, 1), 3, 1);
+
+		const dispatch = fillHandle.table.externalEvents.dispatch;
+		expect(dispatch).toHaveBeenCalledTimes(1);
+		expect(dispatch.mock.calls[0][0]).toBe("rangeFilled");
+		expect(dispatch.mock.calls[0][1].map((cell) => cell.row)).toEqual([
+			rows[1],
+			rows[3],
+		]);
 	});
 
 	test("leaves cells in non-editable columns untouched", () => {

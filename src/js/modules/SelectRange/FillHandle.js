@@ -113,6 +113,7 @@ export default class FillHandle extends CoreFeature {
 		const rows = this.rangeManager.getTableRows();
 		const columns = this.rangeManager.getTableColumns();
 		const rowUpdates = new Map();
+		const filledCells = [];
 
 		target.forEach((x, y) => {
 			if (source.hasPoint(x, y)) {
@@ -137,10 +138,15 @@ export default class FillHandle extends CoreFeature {
 				}
 
 				const update = rowUpdates.get(row);
+				const value = sourceRow.getData()[sourceCol.getField()];
+
+				// Same check updateData uses, so unchanged cells aren't reported
+				if (cell.getValue() !== value) {
+					filledCells.push(cell.getComponent());
+				}
 
 				update.oldData[column.getField()] = cell.getValue();
-				update.newData[column.getField()] =
-					sourceRow.getData()[sourceCol.getField()];
+				update.newData[column.getField()] = value;
 			}
 		});
 
@@ -149,10 +155,15 @@ export default class FillHandle extends CoreFeature {
 		if (rowUpdates.size && this.table.modExists("history")) {
 			this.table.modules.history.action("rangeFill", this.rangeManager.activeRange, {
 				rows: [...rowUpdates.values()],
+				cells: filledCells,
 			});
 		}
 
 		this.table.restoreRedraw();
+
+		if (filledCells.length) {
+			this.dispatchExternal("rangeFilled", filledCells);
+		}
 	}
 
 	/**
