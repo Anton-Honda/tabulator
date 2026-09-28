@@ -42,19 +42,19 @@ export default class RangeComponent {
 	}
 
 	getTopEdge() {
-		return this._range.top;
+		return this._range.rect.top;
 	}
 
 	getBottomEdge() {
-		return this._range.bottom;
+		return this._range.rect.bottom;
 	}
 
 	getLeftEdge() {
-		return this._range.left;
+		return this._range.rect.left;
 	}
 
 	getRightEdge() {
-		return this._range.right;
+		return this._range.rect.right;
 	}
 
 	setBounds(start, end){

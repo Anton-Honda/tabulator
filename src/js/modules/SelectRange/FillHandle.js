@@ -1,28 +1,31 @@
-import CoreFeature from '../../core/CoreFeature.js';
-import Helpers from '../../core/tools/Helpers.js';
+import CoreFeature from "../../core/CoreFeature.js";
+import Range from "./Range.js";
+import Rect from "../../core/tools/Rect.js";
 
-export default class FillHandle extends CoreFeature{
+export default class FillHandle extends CoreFeature {
 	constructor(table, rangeManager) {
 		super(table);
 
 		/** @type {import("./SelectRange.js").default} */
 		this.rangeManager = rangeManager;
 		this.element = null;
+		/** @type {Range|null} */
+		this.preview = null;
+		/** @type {Rect|null} */
 		this.source = null;
+		this.pointerRow = 0;
+		this.pointerCol = 0;
+		this.isActive = false;
 
-		this.mouseDownEvent = this._handleMouseDown.bind(this);
-		this.mouseUpEvent = this._handleMouseUp.bind(this);
+		this.handleMouseDown = this.handleMouseDown.bind(this);
+		this.handleMouseUp = this.handleMouseUp.bind(this);
+		this.handleCellMouseMove = this.handleCellMouseMove.bind(this);
 
-		this.initElement();
-		
-		this.subscribe("range-active-changed", this.attach.bind(this));
-		this.subscribe("cell-mousemove", this._handleCellMouseMove.bind(this));
-	}
-
-	initElement() {
 		this.element = document.createElement("div");
 		this.element.classList.add("tabulator-range-fill-handle");
-		this.element.addEventListener("mousedown", this.mouseDownEvent);
+		this.element.addEventListener("mousedown", this.handleMouseDown);
+
+		this.subscribe("range-active-changed", (range) => this.attach(range));
 	}
 
 	attach(range) {
@@ -31,15 +34,7 @@ export default class FillHandle extends CoreFeature{
 		}
 	}
 
-	isDragging() {
-		return !!this.source;
-	}
-
-	///////////////////////////////////
-	////////// Event Handlers /////////
-	///////////////////////////////////
-
-	_handleMouseDown(e) {
+	handleMouseDown(e) {
 		const range = this.rangeManager.activeRange;
 
 		if (e.button !== 0 || !range) {
@@ -49,47 +44,124 @@ export default class FillHandle extends CoreFeature{
 		e.preventDefault();
 		e.stopPropagation();
 
-		this.source = {
-			start:{row:range.start.row, col:range.start.col},
-			top:range.top,
-			bottom:range.bottom,
-			left:range.left,
-			right:range.right,
-		};
+		this.isActive = true;
+		this.source = range.rect.clone();
+		this.pointerRow = this.source.bottom;
+		this.pointerCol = this.source.right;
 
-		document.addEventListener("mouseup", this.mouseUpEvent);
+		this.preview = new Range(this.table, this.rangeManager, {
+			rect: this.source,
+			skipEvents: true,
+			classNames: ["tabulator-range-fill-preview"],
+		});
+
+		this.rangeManager.rangeContainer.appendChild(this.preview.element);
+		this.preview.layout();
+		this.subscribe("cell-mousemove", this.handleCellMouseMove);
+		document.addEventListener("mouseup", this.handleMouseUp);
 	}
 
-	_handleCellMouseMove(e, cell) {
-		if (this.isDragging()) {
-			this.preview(cell);
-		}
-	}
-	
-	_handleMouseUp() {
-		const source = this.source;
-
-		document.removeEventListener("mouseup", this.mouseUpEvent);
-		this.source = null;
-
-		if (source) {
-			this.fill(source, this.rangeManager.activeRange);
-		}
-	}
-
-	///////////////////////////////////
-	///////        Fill         ///////
-	///////////////////////////////////
-
-	preview(cell) {
+	handleCellMouseMove(e, cell) {
 		if (cell.column === this.rangeManager.rowHeader) {
 			return;
 		}
 
-		const source = this.source;
-		const range = this.rangeManager.activeRange;
-		const row = cell.row.position - 1;
-		const col = cell.column.getPosition() - 1;
+		this.pointerRow = cell.row.position - 1;
+		this.pointerCol = cell.column.getPosition() - 1;
+
+		const rect = FillHandle.extendAlongAxis(
+			this.source,
+			this.pointerRow,
+			this.pointerCol,
+		);
+
+		this.preview.setRect(rect);
+		this.preview.layout();
+	}
+
+	handleMouseUp() {
+		this.isActive = false;
+
+		this.unsubscribe("cell-mousemove", this.handleCellMouseMove);
+		document.removeEventListener("mouseup", this.handleMouseUp);
+
+		this.preview.destroy();
+
+		this.fill(this.source, this.pointerRow, this.pointerCol);
+
+		this.rangeManager.setActiveRangeRect(this.preview.rect);
+	}
+
+	/**
+	 * Fills the cells a drag from `source` to (pointerRow, pointerCol) covers,
+	 * repeating the source's values.
+	 * @param {Rect} source
+	 * @param {number} pointerRow
+	 * @param {number} pointerCol
+	 */
+	fill(source, pointerRow, pointerCol) {
+		const target = FillHandle.extendAlongAxis(source, pointerRow, pointerCol);
+		const height = source.bottom - source.top + 1;
+		const width = source.right - source.left + 1;
+
+		if (target.equals(source)) {
+			return;
+		}
+
+		this.table.blockRedraw();
+
+		const rows = this.rangeManager.getTableRows();
+		const columns = this.rangeManager.getTableColumns();
+		const rowUpdates = new Map();
+
+		target.forEach((x, y) => {
+			if (source.hasPoint(x, y)) {
+				return;
+			}
+
+			const row = rows[y];
+			const column = columns[x];
+			const cell = row.getCell(column);
+
+			if (cell && this.table.modules.edit?.allowEdit(cell)) {
+				const sourceRowPos =
+					source.top + ((((y - source.top) % height) + height) % height);
+				const sourceColPos =
+					source.left + ((((x - source.left) % width) + width) % width);
+				const sourceRow = rows[sourceRowPos];
+				const sourceCol = columns[sourceColPos];
+
+				if (!rowUpdates.has(row)) {
+					// Save old data so we can undo it
+					rowUpdates.set(row, { row, oldData: {}, newData: {} });
+				}
+
+				const update = rowUpdates.get(row);
+
+				update.oldData[column.getField()] = cell.getValue();
+				update.newData[column.getField()] =
+					sourceRow.getData()[sourceCol.getField()];
+			}
+		});
+
+		rowUpdates.forEach(({ row, newData }) => row.updateData(newData));
+
+		if (rowUpdates.size && this.table.modExists("history")) {
+			this.table.modules.history.action("rangeFill", this.rangeManager.activeRange, {
+				rows: [...rowUpdates.values()],
+			});
+		}
+
+		this.table.restoreRedraw();
+	}
+
+	/**
+	 * The rect a fill from `source` covers when the pointer is over (row, col).
+	 * @param {Rect} source
+	 * @param {number} row
+	 * @param {number} col
+	 */
+	static extendAlongAxis(source, row, col) {
 		let rowDelta = 0;
 		let colDelta = 0;
 		let top = source.top;
@@ -118,82 +190,12 @@ export default class FillHandle extends CoreFeature{
 			right = Math.max(right, col);
 		}
 
-		const startRow = source.start.row === source.top ? top : bottom;
-		const startCol = source.start.col === source.left ? left : right;
-
-		range.setStart(startRow, startCol);
-		range.setEnd(startRow === top ? bottom : top, startCol === left ? right : left);
-
-		this.rangeManager.layoutElement(true);
-	}
-
-	fill(source, range) {
-		const height = source.bottom - source.top + 1;
-		const width = source.right - source.left + 1;
-
-		if (range.top === source.top && range.bottom === source.bottom && range.left === source.left && range.right === source.right) {
-			return;
-		}
-
-		this.table.blockRedraw();
-
-		const rows = this.rangeManager.getTableRows();
-		const columns = this.rangeManager.getTableColumns();
-		const updates = new Map();
-
-		for (let r = range.top; r <= range.bottom; r++) {
-			for (let c = range.left; c <= range.right; c++) {
-				const insideSource = r >= source.top && r <= source.bottom && c >= source.left && c <= source.right;
-
-				if (insideSource) {
-					continue;
-				}
-
-				const row = rows[r];
-				const column = columns[c];
-				const cell = row.getCell(column);
-
-				if (cell && this.table.modules.edit?.allowEdit(cell)) {
-					const sourceRow = source.top + (((r - source.top) % height) + height) % height;
-					const sourceCol = source.left + (((c - source.left) % width) + width) % width;
-
-					if (!updates.has(row)) {
-						updates.set(row, {row, oldData:{}, newData:{}});
-					}
-
-					const update = updates.get(row);
-
-					this.seedNestedField(update.oldData, row, column);
-					this.seedNestedField(update.newData, row, column);
-
-					column.setFieldValue(update.oldData, cell.getValue());
-					column.setFieldValue(update.newData, columns[sourceCol].getFieldValue(rows[sourceRow].getData()));
-				}
-			}
-		}
-
-		updates.forEach(({row, newData}) => {
-			row.updateData(newData);
-		});
-
-		if (updates.size && this.table.options.history && this.table.modExists("history")) {
-			this.table.modules.history.action("rangeFill", range, {rows:[...updates.values()]});
-		}
-
-		this.table.restoreRedraw();
-	}
-
-	// A row update replaces whole top-level values, so a nested field must carry its siblings along.
-	seedNestedField(data, row, column) {
-		const root = column.fieldStructure[0];
-
-		if (column.fieldStructure.length > 1 && !(root in data)) {
-			data[root] = Helpers.deepClone(row.getData()[root]);
-		}
+		return new Rect(top, bottom, left, right);
 	}
 
 	destroy() {
-		document.removeEventListener("mouseup", this.mouseUpEvent);
+		document.removeEventListener("mouseup", this.handleMouseUp);
 		this.element.remove();
+		this.preview?.destroy();
 	}
 }

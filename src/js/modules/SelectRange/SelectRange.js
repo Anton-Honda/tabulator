@@ -470,12 +470,7 @@ export default class SelectRange extends Module {
 		}
 		
 		range = this.activeRange;
-		prevRect = {
-			top: range.top,
-			bottom: range.bottom,
-			left: range.left,
-			right: range.right
-		};
+		prevRect = range.rect.clone();
 		
 		rangeEdge = expand ? range.end : range.start;
 		nextRow = rangeEdge.row;
@@ -533,7 +528,7 @@ export default class SelectRange extends Module {
 			this.selecting = "cell";
 		}
 
-		moved = prevRect.top !== range.top || prevRect.bottom !== range.bottom || prevRect.left !== range.left || prevRect.right !== range.right;
+		moved = !prevRect.equals(range.rect);
 
 		if (moved) {
 			row = this.getRowByRangePos(range.end.row);
@@ -927,7 +922,12 @@ export default class SelectRange extends Module {
 		this.activeRange = range;
 		this.dispatch("range-active-changed", range);
 	}
-	
+
+	setActiveRangeRect(rect) {
+		this.activeRange.setRect(rect);
+		this.layoutElement(true);
+	}
+
 	addRange(start, end) {
 		var  range;
 		
@@ -935,7 +935,7 @@ export default class SelectRange extends Module {
 			this.ranges.shift().destroy();
 		}
 		
-		range = new Range(this.table, this, start, end);
+		range = new Range(this.table, this, { start, end });
 		
 		this.setActiveRange(range);
 		this.ranges.push(range);

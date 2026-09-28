@@ -534,6 +534,14 @@ $rangeHeaderTextHighlightBackground: #000000 !default; //header text color when 
 					cursor: crosshair;
 					pointer-events: auto;
 				}
+				
+				&.tabulator-range-fill-preview {
+					border-style: dashed;
+					
+					&::after {
+						display: none;
+					}
+				}
 			}
 			
 			.tabulator-range-cell-active {
