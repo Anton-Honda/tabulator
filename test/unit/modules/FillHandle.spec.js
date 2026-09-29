@@ -17,14 +17,6 @@ class FakeCell {
 		this.row = row;
 		this.column = column;
 	}
-
-	getValue() {
-		return this.row.data[this.column.field];
-	}
-
-	getComponent() {
-		return this;
-	}
 }
 
 class FakeRow {
@@ -38,10 +30,6 @@ class FakeRow {
 
 	getData() {
 		return this.data;
-	}
-
-	updateData(newData) {
-		Object.assign(this.data, newData);
 	}
 }
 
@@ -61,14 +49,9 @@ function createFillHandle() {
 
 	const table = {
 		eventBus: { subscribe: jest.fn() },
-		externalEvents: { dispatch: jest.fn() },
-		blockRedraw: jest.fn(),
-		restoreRedraw: jest.fn(),
 		modules: {
 			edit: { allowEdit: jest.fn((cell) => cell.column.editable) },
-			history: { action: jest.fn() },
 		},
-		modExists: jest.fn((name) => name === "history"),
 	};
 
 	const rangeManager = {
@@ -77,10 +60,6 @@ function createFillHandle() {
 	};
 
 	return new FillHandle(table, rangeManager);
-}
-
-function columnValues(fillHandle, field) {
-	return fillHandle.rangeManager.getTableRows().map((row) => row.data[field]);
 }
 
 describe("FillHandle", () => {
@@ -135,53 +114,44 @@ describe("FillHandle", () => {
 		);
 	});
 
-	test("copies the source value into every target cell", () => {
+	test("buildFillData copies the source value into every target cell", () => {
 		const fillHandle = createFillHandle();
 
-		fillHandle.fill(new Rect(1, 1, 1, 1), 3, 1);
-
-		expect(columnValues(fillHandle, "name")).toEqual(["A", "B", "B", "B", "E"]);
-	});
-
-	test("repeats a multi-cell selection when filling upwards, continuing the pattern backwards", () => {
-		const fillHandle = createFillHandle();
-
-		fillHandle.fill(new Rect(3, 4, 2, 2), 0, 2);
-
-		expect(columnValues(fillHandle, "age")).toEqual([5, 4, 5, 4, 5]);
-	});
-
-	test("records the whole fill as a single history action", () => {
-		const fillHandle = createFillHandle();
-
-		fillHandle.fill(new Rect(0, 0, 1, 1), 2, 1);
-
-		const action = fillHandle.table.modules.history.action;
-		expect(action).toHaveBeenCalledTimes(1);
-		expect(action.mock.calls[0][0]).toBe("rangeFill");
-	});
-
-	test("dispatches rangeFilled with only the cells whose value changed", () => {
-		const fillHandle = createFillHandle();
-		const rows = fillHandle.rangeManager.getTableRows();
-		rows[2].data.name = "A";
-
-		fillHandle.fill(new Rect(0, 0, 1, 1), 3, 1);
-
-		const dispatch = fillHandle.table.externalEvents.dispatch;
-		expect(dispatch).toHaveBeenCalledTimes(1);
-		expect(dispatch.mock.calls[0][0]).toBe("rangeFilled");
-		expect(dispatch.mock.calls[0][1].map((cell) => cell.row)).toEqual([
-			rows[1],
-			rows[3],
+		expect(fillHandle.buildFillData(new Rect(1, 1, 1, 1), 3, 1)).toEqual([
+			{},
+			{ name: "B" },
+			{ name: "B" },
 		]);
 	});
 
-	test("leaves cells in non-editable columns untouched", () => {
+	test("buildFillData repeats a multi-cell selection when filling upwards, continuing the pattern backwards", () => {
 		const fillHandle = createFillHandle();
 
-		fillHandle.fill(new Rect(0, 0, 0, 0), 2, 0);
+		expect(fillHandle.buildFillData(new Rect(3, 4, 2, 2), 0, 2)).toEqual([
+			{ age: 5 },
+			{ age: 4 },
+			{ age: 5 },
+			{},
+			{},
+		]);
+	});
 
-		expect(columnValues(fillHandle, "id")).toEqual([1, 2, 3, 4, 5]);
+	test("buildFillData leaves out cells in non-editable columns", () => {
+		const fillHandle = createFillHandle();
+
+		expect(fillHandle.buildFillData(new Rect(0, 0, 0, 0), 2, 0)).toEqual([
+			{},
+			{},
+			{},
+		]);
+	});
+
+	test("buildFillData returns an empty object per row when the pointer stays in the source", () => {
+		const fillHandle = createFillHandle();
+
+		expect(fillHandle.buildFillData(new Rect(1, 2, 1, 1), 2, 1)).toEqual([
+			{},
+			{},
+		]);
 	});
 });

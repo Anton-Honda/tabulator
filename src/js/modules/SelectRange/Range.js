@@ -173,6 +173,7 @@ export default class Range extends CoreFeature{
 				this.initialized = true;
 
 				if(!this.skipEvents){
+					this.dispatch("range-added", this);
 					this.dispatchExternal("rangeAdded", this.getComponent());
 				}
 			}
@@ -373,6 +374,58 @@ export default class Range extends CoreFeature{
 		
 	}
 	
+	setData(data){
+		const rows = this.getCells(true);
+		const rowUpdates = new Map();
+		const cellValues = [];
+		let hasChanges = false;
+		
+		this.table.blockRedraw();
+		
+		rows.forEach((cells, rowIndex) => {
+			const rowData = data[rowIndex];
+			
+			cells.forEach((cell) => {
+				const field = cell.column.getField();
+				const oldValue = cell.getValue();
+				let newValue = oldValue;
+				
+				if(field in rowData){
+					newValue = rowData[field];
+					
+					// Same check updateData uses, so unchanged cells aren't reported
+					if(oldValue !== newValue){
+						hasChanges = true;
+					}
+					
+					if(!rowUpdates.has(cell.row)){
+						rowUpdates.set(cell.row, {});
+					}
+					
+					rowUpdates.get(cell.row)[field] = newValue;
+				}
+				
+				// Undo matches cellValues to getCells() by index, so it must
+				// cover every cell of the range, not just the changed ones.
+				cellValues.push({ oldValue, newValue });
+			});
+		});
+		
+		rowUpdates.forEach((newData, row) => row.updateData(newData));
+		
+		if(hasChanges && this.table.modExists("history")){
+			this.table.modules.history.action("rangeEdit", this, {
+				cells: cellValues,
+			});
+		}
+		
+		if(hasChanges){
+			this.dispatchExternal("rangeEdited", this);
+		}
+		
+		this.table.restoreRedraw();
+	}
+	
 	getBounds(component){
 		var cells = this.getCells(false, component),
 		output = {
@@ -388,6 +441,14 @@ export default class Range extends CoreFeature{
 		}
 		
 		return output;
+	}
+	
+	getStartCell(){
+		return this.rangeManager.getCell(this.start.row, this.start.col);
+	}
+	
+	getEndCell(){
+		return this.rangeManager.getCell(this.end.row, this.end.col);
 	}
 	
 	getComponent() {

@@ -83,6 +83,12 @@ export default class RangeComponent {
 		}
 	}
 
+	setData(data){
+		if(this._range.destroyedGuard("setData")){
+			this._range.setData(data);
+		}
+	}
+
 	remove(){
 		if(this._range.destroyedGuard("remove")){
 			this._range.destroy(true);

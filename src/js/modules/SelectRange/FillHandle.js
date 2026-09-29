@@ -66,8 +66,15 @@ export default class FillHandle extends CoreFeature {
 			return;
 		}
 
-		this.pointerRow = cell.row.position - 1;
-		this.pointerCol = cell.column.getPosition() - 1;
+		const row = cell.row.position - 1;
+		const col = cell.column.getPosition() - 1;
+
+		if (row === this.pointerRow && col === this.pointerCol) {
+			return;
+		}
+
+		this.pointerRow = row;
+		this.pointerCol = col;
 
 		const rect = FillHandle.extendAlongAxis(
 			this.source,
@@ -79,52 +86,62 @@ export default class FillHandle extends CoreFeature {
 		this.preview.layout();
 	}
 
-	handleMouseUp() {
+	async handleMouseUp() {
 		this.isActive = false;
 
 		this.unsubscribe("cell-mousemove", this.handleCellMouseMove);
 		document.removeEventListener("mouseup", this.handleMouseUp);
 
+		this.rangeManager.clearRanges();
+
+		const range = await this.addInitializedRange(
+			this.preview.getStartCell(),
+			this.preview.getEndCell()
+		);
+
+		const data = this.buildFillData(
+			this.source,
+			this.pointerRow,
+			this.pointerCol,
+		);
+
+		range.setData(data);
+
 		this.preview.destroy();
-
-		this.fill(this.source, this.pointerRow, this.pointerCol);
-
-		this.rangeManager.setActiveRangeRect(this.preview.rect);
 	}
 
 	/**
-	 * Fills the cells a drag from `source` to (pointerRow, pointerCol) covers,
-	 * repeating the source's values.
+	 * The data, in Range.setData shape, for the cells a drag from `source` to
+	 * (pointerRow, pointerCol) covers, repeating the source's values.
 	 * @param {Rect} source
 	 * @param {number} pointerRow
 	 * @param {number} pointerCol
 	 */
-	fill(source, pointerRow, pointerCol) {
+	buildFillData(source, pointerRow, pointerCol) {
 		const target = FillHandle.extendAlongAxis(source, pointerRow, pointerCol);
 		const height = source.bottom - source.top + 1;
 		const width = source.right - source.left + 1;
 
-		if (target.equals(source)) {
-			return;
-		}
-
-		this.table.blockRedraw();
-
 		const rows = this.rangeManager.getTableRows();
 		const columns = this.rangeManager.getTableColumns();
-		const rowUpdates = new Map();
-		const filledCells = [];
+		const data = [];
 
-		target.forEach((x, y) => {
-			if (source.hasPoint(x, y)) {
-				return;
-			}
-
+		for (let y = target.top; y <= target.bottom; y++) {
 			const row = rows[y];
-			const column = columns[x];
-			const cell = row.getCell(column);
+			const rowData = {};
 
-			if (cell && this.table.modules.edit?.allowEdit(cell)) {
+			for (let x = target.left; x <= target.right; x++) {
+				const column = columns[x];
+				const cell = row.getCell(column);
+
+				if (
+					source.hasPoint(x, y) ||
+					!cell ||
+					!this.table.modules.edit?.allowEdit(cell)
+				) {
+					continue;
+				}
+
 				const sourceRowPos =
 					source.top + ((((y - source.top) % height) + height) % height);
 				const sourceColPos =
@@ -132,38 +149,33 @@ export default class FillHandle extends CoreFeature {
 				const sourceRow = rows[sourceRowPos];
 				const sourceCol = columns[sourceColPos];
 
-				if (!rowUpdates.has(row)) {
-					// Save old data so we can undo it
-					rowUpdates.set(row, { row, oldData: {}, newData: {} });
-				}
-
-				const update = rowUpdates.get(row);
-				const value = sourceRow.getData()[sourceCol.getField()];
-
-				// Same check updateData uses, so unchanged cells aren't reported
-				if (cell.getValue() !== value) {
-					filledCells.push(cell.getComponent());
-				}
-
-				update.oldData[column.getField()] = cell.getValue();
-				update.newData[column.getField()] = value;
+				rowData[column.getField()] = sourceRow.getData()[sourceCol.getField()];
 			}
-		});
 
-		rowUpdates.forEach(({ row, newData }) => row.updateData(newData));
+			data.push(rowData);
+		}
 
-		if (rowUpdates.size && this.table.modExists("history")) {
-			this.table.modules.history.action("rangeFill", this.rangeManager.activeRange, {
-				rows: [...rowUpdates.values()],
-				cells: filledCells,
+		return data;
+	}
+
+	addInitializedRange(start, end) {
+		const range = this.rangeManager.addRange(start, end);
+
+		if (!range.initialized) {
+			return new Promise((resolve) => {
+				const handleRangeAdded = (promisedRange) => {
+					if (promisedRange !== range) {
+						return;
+					}
+					this.unsubscribe("range-added", handleRangeAdded);
+					resolve(range);
+				};
+
+				this.subscribe("range-added", handleRangeAdded);
 			});
 		}
 
-		this.table.restoreRedraw();
-
-		if (filledCells.length) {
-			this.dispatchExternal("rangeFilled", filledCells);
-		}
+		return Promise.resolve(range);
 	}
 
 	/**

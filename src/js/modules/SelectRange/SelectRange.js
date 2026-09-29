@@ -923,11 +923,6 @@ export default class SelectRange extends Module {
 		this.dispatch("range-active-changed", range);
 	}
 
-	setActiveRangeRect(rect) {
-		this.activeRange.setRect(rect);
-		this.layoutElement(true);
-	}
-
 	addRange(start, end) {
 		var  range;
 		
