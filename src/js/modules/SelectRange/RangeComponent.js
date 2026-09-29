@@ -89,6 +89,12 @@ export default class RangeComponent {
 		}
 	}
 
+	fill(value){
+		if(this._range.destroyedGuard("fill")){
+			this._range.fill(value);
+		}
+	}
+
 	remove(){
 		if(this._range.destroyedGuard("remove")){
 			this._range.destroy(true);

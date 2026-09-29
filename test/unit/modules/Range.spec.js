@@ -34,8 +34,8 @@ describe("Range.setData", () => {
 		table.destroy();
 	});
 
-	test("sets the given fields and leaves the others untouched", () => {
-		range.setData([{ name: "X" }, { age: 9 }]);
+	test("sets values by position and leaves cells past a short row untouched", () => {
+		range.setData([["X"], ["B", 9]]);
 
 		expect(table.getData()).toEqual([
 			{ name: "X", age: 1 },
@@ -44,7 +44,7 @@ describe("Range.setData", () => {
 	});
 
 	test("records one history action that undoes every cell", () => {
-		range.setData([{ name: "X", age: 8 }, { name: "Y", age: 9 }]);
+		range.setData([["X", 8], ["Y", 9]]);
 
 		expect(table.getHistoryUndoSize()).toBe(1);
 
@@ -65,7 +65,7 @@ describe("Range.setData", () => {
 		const rangeEdited = jest.fn();
 		table.on("rangeEdited", rangeEdited);
 
-		range.setData([{ name: "X" }, { name: "Y" }]);
+		range.setData([["X"], ["Y"]]);
 
 		expect(rangeEdited).toHaveBeenCalledTimes(1);
 	});
@@ -74,9 +74,21 @@ describe("Range.setData", () => {
 		const rangeEdited = jest.fn();
 		table.on("rangeEdited", rangeEdited);
 
-		range.setData([{ name: "A" }, {}]);
+		range.setData([["A"], []]);
 
 		expect(table.getHistoryUndoSize()).toBe(0);
 		expect(rangeEdited).not.toHaveBeenCalled();
+	});
+
+	test("skips non-editable cells", () => {
+		// What `editable: false` on the column definition compiles to
+		table.columnManager.getColumnByField("age").modules.edit.check = false;
+
+		range.setData([["X", 8], ["Y", 9]]);
+
+		expect(table.getData()).toEqual([
+			{ name: "X", age: 1 },
+			{ name: "Y", age: 2 },
+		]);
 	});
 });

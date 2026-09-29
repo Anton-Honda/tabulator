@@ -127,21 +127,9 @@ export default class FillHandle extends CoreFeature {
 		const data = [];
 
 		for (let y = target.top; y <= target.bottom; y++) {
-			const row = rows[y];
-			const rowData = {};
+			const rowData = [];
 
 			for (let x = target.left; x <= target.right; x++) {
-				const column = columns[x];
-				const cell = row.getCell(column);
-
-				if (
-					source.hasPoint(x, y) ||
-					!cell ||
-					!this.table.modules.edit?.allowEdit(cell)
-				) {
-					continue;
-				}
-
 				const sourceRowPos =
 					source.top + ((((y - source.top) % height) + height) % height);
 				const sourceColPos =
@@ -149,7 +137,7 @@ export default class FillHandle extends CoreFeature {
 				const sourceRow = rows[sourceRowPos];
 				const sourceCol = columns[sourceColPos];
 
-				rowData[column.getField()] = sourceRow.getData()[sourceCol.getField()];
+				rowData.push(sourceRow.getData()[sourceCol.getField()]);
 			}
 
 			data.push(rowData);

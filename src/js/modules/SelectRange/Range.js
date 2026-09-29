@@ -383,15 +383,17 @@ export default class Range extends CoreFeature{
 		this.table.blockRedraw();
 		
 		rows.forEach((cells, rowIndex) => {
-			const rowData = data[rowIndex];
-			
-			cells.forEach((cell) => {
+			const rowValues = data[rowIndex];
+
+			cells.forEach((cell, colIndex) => {
 				const field = cell.column.getField();
 				const oldValue = cell.getValue();
+				const editable = !this.table.modExists("edit")
+					|| this.table.modules.edit.allowEdit(cell);
 				let newValue = oldValue;
-				
-				if(field in rowData){
-					newValue = rowData[field];
+
+				if(editable && field && colIndex < rowValues.length){
+					newValue = rowValues[colIndex];
 					
 					// Same check updateData uses, so unchanged cells aren't reported
 					if(oldValue !== newValue){
@@ -425,7 +427,13 @@ export default class Range extends CoreFeature{
 		
 		this.table.restoreRedraw();
 	}
-	
+
+	fill(value){
+		const columns = this.getColumns();
+		const data = this.getRows().map(() => columns.map(() => value));
+		this.setData(data);
+	}
+
 	getBounds(component){
 		var cells = this.getCells(false, component),
 		output = {

@@ -118,9 +118,9 @@ describe("FillHandle", () => {
 		const fillHandle = createFillHandle();
 
 		expect(fillHandle.buildFillData(new Rect(1, 1, 1, 1), 3, 1)).toEqual([
-			{},
-			{ name: "B" },
-			{ name: "B" },
+			["B"],
+			["B"],
+			["B"],
 		]);
 	});
 
@@ -128,30 +128,20 @@ describe("FillHandle", () => {
 		const fillHandle = createFillHandle();
 
 		expect(fillHandle.buildFillData(new Rect(3, 4, 2, 2), 0, 2)).toEqual([
-			{ age: 5 },
-			{ age: 4 },
-			{ age: 5 },
-			{},
-			{},
+			[5],
+			[4],
+			[5],
+			[4],
+			[5],
 		]);
 	});
 
-	test("buildFillData leaves out cells in non-editable columns", () => {
-		const fillHandle = createFillHandle();
-
-		expect(fillHandle.buildFillData(new Rect(0, 0, 0, 0), 2, 0)).toEqual([
-			{},
-			{},
-			{},
-		]);
-	});
-
-	test("buildFillData returns an empty object per row when the pointer stays in the source", () => {
+	test("buildFillData returns the source values when the pointer stays in the source", () => {
 		const fillHandle = createFillHandle();
 
 		expect(fillHandle.buildFillData(new Rect(1, 2, 1, 1), 2, 1)).toEqual([
-			{},
-			{},
+			["B"],
+			["C"],
 		]);
 	});
 });
