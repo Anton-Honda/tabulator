@@ -420,7 +420,7 @@ export default class Range extends CoreFeature{
 		}
 		
 		if(hasChanges){
-			this.dispatchExternal("rangeEdited", this);
+			this.dispatchExternal("rangeEdited", this.getComponent());
 		}
 		
 		this.table.restoreRedraw();
