@@ -1,5 +1,6 @@
 import Module from "../../core/Module.js";
 import Range from "./Range.js";
+import FillHandle from "./FillHandle.js";
 import extensions from './extensions/extensions.js';
 
 
@@ -21,8 +22,10 @@ export default class SelectRange extends Module {
 		this.columnSelection = false;
 		this.rowSelection = false;
 		this.maxRanges = 0;
+		/** @type {Range|false} */
 		this.activeRange = false;
 		this.blockKeydown = false;
+		this.fillHandle = null;
 		
 		this.keyDownEvent = this._handleKeyDown.bind(this);
 		this.mouseUpEvent = this._handleMouseUp.bind(this);
@@ -35,6 +38,7 @@ export default class SelectRange extends Module {
 		this.registerTableOption("selectableRangeAutoFocus", true); //focus on a cell after resetRanges
 		this.registerTableOption("selectableRangeInitializeDefault", true); //initializes default range on cell [0,0]
 		this.registerTableOption("selectableRangeBlurEditOnNavigate", undefined); //prevent editing on navigation
+		this.registerTableOption("selectableRangeFill", false); //drag the range handle to fill neighbouring cells
 		
 		this.registerTableFunction("getRangesData", this.getRangesData.bind(this));
 		this.registerTableFunction("getRanges", this.getRanges.bind(this));
@@ -87,6 +91,10 @@ export default class SelectRange extends Module {
 		
 		this.overlay.appendChild(this.rangeContainer);
 		this.overlay.appendChild(this.activeRangeCellElement);
+		
+		if(this.options("selectableRangeFill")){
+			this.fillHandle = new FillHandle(this.table, this);
+		}
 		
 		this.table.rowManager.element.addEventListener("keydown", this.keyDownEvent);
 		
@@ -462,12 +470,7 @@ export default class SelectRange extends Module {
 		}
 		
 		range = this.activeRange;
-		prevRect = {
-			top: range.top,
-			bottom: range.bottom,
-			left: range.left,
-			right: range.right
-		};
+		prevRect = range.rect.clone();
 		
 		rangeEdge = expand ? range.end : range.start;
 		nextRow = rangeEdge.row;
@@ -525,7 +528,7 @@ export default class SelectRange extends Module {
 			this.selecting = "cell";
 		}
 
-		moved = prevRect.top !== range.top || prevRect.bottom !== range.bottom || prevRect.left !== range.left || prevRect.right !== range.right;
+		moved = !prevRect.equals(range.rect);
 
 		if (moved) {
 			row = this.getRowByRangePos(range.end.row);
@@ -563,7 +566,7 @@ export default class SelectRange extends Module {
 		
 		if(this.activeRange === removed){
 			if(this.ranges.length){
-				this.activeRange = this.ranges[this.ranges.length - 1];
+				this.setActiveRange(this.ranges[this.ranges.length - 1]);
 			}else{
 				this.addRange();
 			}
@@ -915,6 +918,11 @@ export default class SelectRange extends Module {
 		return this.table.columnManager.getVisibleColumnsByIndex();
 	}
 	
+	setActiveRange(range) {
+		this.activeRange = range;
+		this.dispatch("range-active-changed", range);
+	}
+
 	addRange(start, end) {
 		var  range;
 		
@@ -922,9 +930,9 @@ export default class SelectRange extends Module {
 			this.ranges.shift().destroy();
 		}
 		
-		range = new Range(this.table, this, start, end);
+		range = new Range(this.table, this, { start, end });
 		
-		this.activeRange = range;
+		this.setActiveRange(range);
 		this.ranges.push(range);
 		this.rangeContainer.appendChild(range.element);
 		
@@ -969,6 +977,7 @@ export default class SelectRange extends Module {
 	
 	tableDestroyed(){
 		document.removeEventListener("mouseup", this.mouseUpEvent);
+		this.fillHandle?.destroy();
 		this.table.rowManager.element.removeEventListener("keydown", this.keyDownEvent);
 	}
 	
