@@ -90,7 +90,7 @@ describe("Range.setData", () => {
 	});
 
 	test("getModifiedCells is null until the range is edited", () => {
-		expect(range.getModifiedCells()).toBeNull();
+		expect(range.getModifiedCells()).toEqual([]);
 	});
 
 	test("getModifiedCells only reports the cells whose value actually changed", () => {

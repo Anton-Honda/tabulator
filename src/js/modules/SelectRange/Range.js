@@ -22,7 +22,7 @@ export default class Range extends CoreFeature{
 		this.rect = options.rect ? options.rect.clone() : Rect.zero();
 		
 		this.table = table;
-		this.modifiedCells = null;
+		this.modifiedCells = [];
 		this.start = {row:undefined, col:undefined};
 		this.end = {row:undefined, col:undefined};
 
@@ -382,7 +382,7 @@ export default class Range extends CoreFeature{
 		const changedCells = [];
 		let hasChanges = false;
 		
-		this.modifiedCells = null;
+		this.modifiedCells = [];
 		this.table.blockRedraw();
 		
 		rows.forEach((cells, rowIndex) => {
@@ -401,7 +401,7 @@ export default class Range extends CoreFeature{
 					// Same check updateData uses, so unchanged cells aren't reported
 					if(oldValue !== newValue){
 						hasChanges = true;
-						changedCells.push(cell.getComponent());
+						this.modifiedCells.push(cell.getComponent());
 					}
 					
 					if(!rowUpdates.has(cell.row)){
@@ -426,7 +426,6 @@ export default class Range extends CoreFeature{
 		}
 		
 		if(hasChanges){
-			this.modifiedCells = changedCells;
 			this.dispatchExternal("rangeEdited", this.getComponent());
 		}
 		
