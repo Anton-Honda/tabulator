@@ -379,7 +379,6 @@ export default class Range extends CoreFeature{
 		const rows = this.getCells(true);
 		const rowUpdates = new Map();
 		const cellValues = [];
-		const changedCells = [];
 		let hasChanges = false;
 		
 		this.modifiedCells = [];
