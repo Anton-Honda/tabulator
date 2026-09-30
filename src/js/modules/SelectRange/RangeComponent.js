@@ -25,6 +25,10 @@ export default class RangeComponent {
 		return this._range.getCells(true, true);
 	}
 
+	getModifiedCells() {
+		return this._range.modifiedCells;
+	}
+
 	getStructuredCells() {
 		return this._range.getStructuredCells();
 	}
