@@ -1,5 +1,7 @@
 import TabulatorFull from "../../../src/js/core/TabulatorFull.js";
 
+const cellFields = (cells) => cells.map((cell) => [cell.getField(), cell.getValue()]);
+
 describe("Range.setData", () => {
 	let table;
 	let range;
@@ -70,16 +72,16 @@ describe("Range.setData", () => {
 		expect(rangeEdited).toHaveBeenCalledTimes(1);
 	});
 
-	test("dispatches rangeEdited with the range component and the changed cells", () => {
+	test("exposes the changed cells on the component passed to rangeEdited", () => {
 		const rangeEdited = jest.fn();
 		table.on("rangeEdited", rangeEdited);
 
 		range.setData([["X", 8], ["Y", 9]]);
 
-		const [rangeComponent, changedCells] = rangeEdited.mock.calls[0];
+		const rangeComponent = rangeEdited.mock.calls[0][0];
 
 		expect(rangeComponent).toBe(table.getRanges()[0]);
-		expect(changedCells.map((cell) => [cell.getField(), cell.getValue()])).toEqual([
+		expect(cellFields(rangeComponent.getModifiedCells())).toEqual([
 			["name", "X"],
 			["age", 8],
 			["name", "Y"],
@@ -87,33 +89,27 @@ describe("Range.setData", () => {
 		]);
 	});
 
-	test("rangeEdited only reports the cells whose value actually changed", () => {
-		const rangeEdited = jest.fn();
-		table.on("rangeEdited", rangeEdited);
+	test("getModifiedCells is null until the range is edited", () => {
+		expect(range.getModifiedCells()).toBeNull();
+	});
 
+	test("getModifiedCells only reports the cells whose value actually changed", () => {
 		// "A" and 2 match the existing values, so only two cells change
 		range.setData([["A", 8], ["Y", 2]]);
 
-		const changedCells = rangeEdited.mock.calls[0][1];
-
-		expect(changedCells.map((cell) => [cell.getField(), cell.getValue()])).toEqual([
+		expect(cellFields(range.getModifiedCells())).toEqual([
 			["age", 8],
 			["name", "Y"],
 		]);
 	});
 
-	test("rangeEdited omits cells past a short row and non-editable cells", () => {
+	test("getModifiedCells omits cells past a short row and non-editable cells", () => {
 		// What `editable: false` on the column definition compiles to
 		table.columnManager.getColumnByField("age").modules.edit.check = false;
 
-		const rangeEdited = jest.fn();
-		table.on("rangeEdited", rangeEdited);
-
 		range.setData([["X"], ["Y", 9]]);
 
-		const changedCells = rangeEdited.mock.calls[0][1];
-
-		expect(changedCells.map((cell) => [cell.getField(), cell.getValue()])).toEqual([
+		expect(cellFields(range.getModifiedCells())).toEqual([
 			["name", "X"],
 			["name", "Y"],
 		]);

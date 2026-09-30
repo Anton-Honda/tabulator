@@ -22,6 +22,7 @@ export default class Range extends CoreFeature{
 		this.rect = options.rect ? options.rect.clone() : Rect.zero();
 		
 		this.table = table;
+		this.modifiedCells = null;
 		this.start = {row:undefined, col:undefined};
 		this.end = {row:undefined, col:undefined};
 
@@ -381,6 +382,7 @@ export default class Range extends CoreFeature{
 		const changedCells = [];
 		let hasChanges = false;
 		
+		this.modifiedCells = null;
 		this.table.blockRedraw();
 		
 		rows.forEach((cells, rowIndex) => {
@@ -424,7 +426,8 @@ export default class Range extends CoreFeature{
 		}
 		
 		if(hasChanges){
-			this.dispatchExternal("rangeEdited", this.getComponent(), changedCells);
+			this.modifiedCells = changedCells;
+			this.dispatchExternal("rangeEdited", this.getComponent());
 		}
 		
 		this.table.restoreRedraw();
